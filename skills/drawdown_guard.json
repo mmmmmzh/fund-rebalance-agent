@@ -1,0 +1,8 @@
+{
+  "skill_id": "drawdown_guard",
+  "name": "回撤风险哨兵",
+  "description": "根据近 60 日最大回撤与波动识别风险压力。",
+  "kind": "builtin",
+  "handler": "drawdown_guard",
+  "weight": 1.0
+}

@@ -1,0 +1,8 @@
+code,name,category,is_equity_like,instrument_type,status,notes
+800001,Demo Broad Market ETF,broad_market,true,synthetic_etf,synthetic-demo,Not a real financial instrument
+800002,Demo Mid Market ETF,mid_market,true,synthetic_etf,synthetic-demo,Not a real financial instrument
+800003,Demo Growth ETF,growth,true,synthetic_etf,synthetic-demo,Not a real financial instrument
+800004,Demo Defensive ETF,defensive,true,synthetic_etf,synthetic-demo,Not a real financial instrument
+800005,Demo Bond ETF,bond,false,synthetic_etf,synthetic-demo,Not a real financial instrument
+800006,Demo Commodity ETF,commodity,false,synthetic_etf,synthetic-demo,Not a real financial instrument
+800007,Demo Global ETF,overseas,true,synthetic_etf,synthetic-demo,Not a real financial instrument

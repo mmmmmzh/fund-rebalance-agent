@@ -1,0 +1,8 @@
+{
+  "skill_id": "momentum_confirmation",
+  "name": "多周期趋势确认",
+  "description": "比较近 20 日与 60 日收益，识别趋势方向是否一致。",
+  "kind": "builtin",
+  "handler": "momentum_confirmation",
+  "weight": 1.0
+}
