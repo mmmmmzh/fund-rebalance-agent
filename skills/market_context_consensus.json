@@ -1,0 +1,8 @@
+{
+  "skill_id": "market_context_consensus",
+  "name": "市场信号一致性",
+  "description": "汇总离线市场上下文或显式插件信号及其置信度。",
+  "kind": "builtin",
+  "handler": "market_context_consensus",
+  "weight": 1.0
+}

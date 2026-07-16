@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=77,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fund-rebalance-agent"
+version = "0.1.0"
+description = "A risk-aware ETF and mutual-fund research agent with auditable workflows."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.8,<4",
+    "numpy>=1.26,<3",
+    "pandas>=2.1,<4",
+    "pillow>=12.3,<13",
+    "pydantic>=2.6,<3",
+    "scipy>=1.11,<2",
+]
+
+[project.optional-dependencies]
+agent = [
+    "langgraph>=0.2,<2",
+    "langgraph-checkpoint-sqlite>=2,<4",
+]
+app = [
+    "streamlit>=1.35,<2",
+]
+dev = [
+    "pip-audit>=2.9,<3",
+    "pytest>=8,<10",
+    "ruff>=0.5,<1",
+]
+
+[project.scripts]
+fund-agent = "fund_agent.cli:main"
+fund-agent-frequency-ablation = "fund_agent.frequency_ablation:main"
+fund-agent-dashboard = "fund_agent.streamlit_app:main"
+fund-agent-universe = "fund_agent.universe_manager:main"
+fund-agent-screen = "fund_agent.fund_screener:main"
+fund-agent-profile = "fund_agent.user_profile:main"
+fund-agent-workflow = "fund_agent.workflow_cli:main"
+fund-agent-scheduler = "fund_agent.scheduler:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

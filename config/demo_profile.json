@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "profile_name": "synthetic-etf-demo",
+  "risk_profile": "balanced",
+  "data_source": "sample",
+  "market_context_source": "sample",
+  "calendar_source": "weekdays",
+  "start_date": "2023-01-01",
+  "lookback_days": 60,
+  "rebalance_freq": "D",
+  "universe_file": "../data/demo/etf_universe.csv",
+  "portfolio_file": "../data/demo/portfolio.csv",
+  "candidate_watchlist_file": "../user_data/demo/candidate_watchlist.csv",
+  "investable_universe_file": "../user_data/demo/investable_universe.csv",
+  "paper_ledger_file": "../user_data/demo/paper_trades.csv",
+  "signal_history_file": "../user_data/demo/signal_history.csv",
+  "validation_dir": "../user_data/demo/validation",
+  "output_root": "../user_data/demo/runs",
+  "state_dir": "../user_data/demo/.agent",
+  "skills_dir": "../user_data/demo/skills",
+  "human_approval_required": true,
+  "research_topics": [
+    {
+      "name": "宽基风格",
+      "board_type": "concept",
+      "board_name": "broad-market-synthetic",
+      "fund_categories": ["broad_market"]
+    },
+    {
+      "name": "成长风格",
+      "board_type": "concept",
+      "board_name": "growth-synthetic",
+      "fund_categories": ["growth"]
+    },
+    {
+      "name": "防御风格",
+      "board_type": "concept",
+      "board_name": "defensive-synthetic",
+      "fund_categories": ["defensive"]
+    }
+  ]
+}
