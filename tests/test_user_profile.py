@@ -44,6 +44,16 @@ def test_profile_rejects_invalid_schedule_time(tmp_path) -> None:
         raise AssertionError("Invalid schedule time was accepted")
 
 
+def test_profile_rejects_disabled_human_approval_with_migration_error(tmp_path) -> None:
+    profile_path = initialize_user_workspace(tmp_path / "approval", "approval")
+    payload = json.loads(profile_path.read_text(encoding="utf-8"))
+    payload["human_approval_required"] = False
+    profile_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="公开版强制人工确认"):
+        load_user_profile(profile_path)
+
+
 def test_ensure_runtime_files_creates_private_csvs(tmp_path) -> None:
     profile_path = initialize_user_workspace(tmp_path / "carol", "carol")
     loaded = load_user_profile(profile_path)
