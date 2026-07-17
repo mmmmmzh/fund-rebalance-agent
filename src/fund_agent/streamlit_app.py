@@ -73,7 +73,7 @@ def main() -> None:
     cols[0].metric("研究池", overview["universe_count"])
     cols[1].metric("本地持仓", overview["portfolio_count"])
     cols[2].metric("数据模式", "离线合成" if loaded.profile.data_source == "sample" else "插件")
-    cols[3].metric("人工确认", "开启" if loaded.profile.human_approval_required else "关闭")
+    cols[3].metric("人工确认", "必需")
 
     task_tab, funds_tab, validation_tab, history_tab, settings_tab = st.tabs(
         ["任务", "本地数据", "前向验证", "运行历史", "边界"]
@@ -318,7 +318,7 @@ def _settings_panel(loaded) -> None:
             "rebalance_freq": profile.rebalance_freq,
             "data_source": profile.data_source,
             "market_context_source": profile.market_context_source,
-            "human_approval_required": profile.human_approval_required,
+            "human_approval": "required",
         }
     )
     st.warning(

@@ -194,13 +194,22 @@ class UserProfile(BaseModel):
             "market_context_consensus",
         ]
     )
-    human_approval_required: bool = True
+    human_approval_required: Literal[True] = True
     schedule: ScheduleSettings = Field(default_factory=ScheduleSettings)
     screening: ScreeningSettings = Field(default_factory=ScreeningSettings)
     market_actions: MarketActionSettings = Field(default_factory=MarketActionSettings)
     investment_policy: InvestmentPolicySettings = Field(default_factory=InvestmentPolicySettings)
     validation: ValidationSettings = Field(default_factory=ValidationSettings)
     research_topics: list[ResearchTopic] = Field(default_factory=list)
+
+    @field_validator("human_approval_required", mode="before")
+    @classmethod
+    def require_human_approval(cls, value: object) -> bool:
+        if value is not True:
+            raise ValueError(
+                "公开版强制人工确认；请删除 human_approval_required=false 配置或改为 true。"
+            )
+        return True
 
 
 @dataclass(frozen=True)
@@ -472,8 +481,6 @@ def validate_user_profile(loaded: LoadedProfile) -> list[str]:
             has_values = float(values.fillna(0.0).sum()) > 0
             if not has_weights and not has_values:
                 warnings.append("portfolio needs current_weight or current_value_yuan.")
-    if not loaded.profile.human_approval_required:
-        warnings.append("human_approval_required is disabled; this is not recommended.")
     return warnings
 
 
