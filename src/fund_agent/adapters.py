@@ -10,6 +10,13 @@ from fund_agent.config import FundSpec
 
 
 class PriceDataAdapter(Protocol):
+    """Return adjusted daily NAV data that satisfies the public plugin contract.
+
+    The frame uses timezone-naive trading dates as its index and fund codes as
+    columns. See DATA_SOURCES.md for ordering, missing-value, and adjustment
+    requirements enforced by the core.
+    """
+
     def __call__(
         self,
         universe: tuple[FundSpec, ...],
