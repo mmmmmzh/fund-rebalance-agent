@@ -6,3 +6,4 @@ code,name,category,is_equity_like,instrument_type,status,notes
 800005,Demo Bond ETF,bond,false,synthetic_etf,synthetic-demo,Not a real financial instrument
 800006,Demo Commodity ETF,commodity,false,synthetic_etf,synthetic-demo,Not a real financial instrument
 800007,Demo Global ETF,overseas,true,synthetic_etf,synthetic-demo,Not a real financial instrument
+800008,Demo Short Bond ETF,short_bond,false,synthetic_etf,synthetic-demo,Not a real financial instrument

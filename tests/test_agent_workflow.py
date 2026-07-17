@@ -55,10 +55,10 @@ def test_daily_workflow_interrupts_and_can_be_rejected(tmp_path: Path) -> None:
     assert result["status"] == "awaiting_approval"
     assert result["interrupts"]
     assert Path(result["analysis_report_path"]).exists()
-    assert len(result["fund_analyses"]) == 7
+    assert len(result["fund_analyses"]) == len(universe)
     assert result["research_actions"]
     assert len(result["research_actions"]) >= len(result["proposed_actions"])
-    assert result["portfolio_summary"]["fund_count"] == 7
+    assert result["portfolio_summary"]["fund_count"] == len(universe)
     assert "逐基金净值技术面与市场环境判断" in Path(result["analysis_report_path"]).read_text(
         encoding="utf-8"
     )

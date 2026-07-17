@@ -36,6 +36,7 @@ DEFAULT_FUND_UNIVERSE: tuple[FundSpec, ...] = (
     FundSpec("800005", "Demo Bond ETF", "bond", False),
     FundSpec("800006", "Demo Commodity ETF", "commodity", False),
     FundSpec("800007", "Demo Global ETF", "overseas", True),
+    FundSpec("800008", "Demo Short Bond ETF", "short_bond", False),
 )
 
 
