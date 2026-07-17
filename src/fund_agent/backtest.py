@@ -7,7 +7,7 @@ import pandas as pd
 
 from fund_agent.config import DEFAULT_REBALANCE_FREQ, FundSpec, RiskProfile
 from fund_agent.metrics import compute_returns, summarize_portfolio
-from fund_agent.optimizer import AllocationResult, limit_turnover
+from fund_agent.optimizer import AllocationResult, apply_constraints, limit_turnover
 
 
 Allocator = Callable[[pd.DataFrame, tuple[FundSpec, ...], RiskProfile], AllocationResult]
@@ -44,7 +44,11 @@ def walk_forward_backtest(
             f"usable_rebalance_points={len(rebalance_dates)}."
         )
 
-    previous_weights = pd.Series(1.0 / len(returns.columns), index=returns.columns)
+    previous_weights = apply_constraints(
+        pd.Series(1.0 / len(returns.columns), index=returns.columns),
+        fund_universe,
+        profile,
+    )
     realized_returns = []
     weights_records = []
     turnover_records = []
@@ -54,7 +58,13 @@ def walk_forward_backtest(
         loc = returns.index.get_loc(rebalance_date)
         window = returns.iloc[loc - lookback_days:loc]
         allocation = allocator(window, fund_universe, profile)
-        target_weights = limit_turnover(allocation.weights, previous_weights, profile.max_turnover)
+        target_weights = limit_turnover(
+            allocation.weights,
+            previous_weights,
+            profile.max_turnover,
+            fund_universe,
+            profile,
+        )
         turnover = float((target_weights - previous_weights).abs().sum() / 2.0)
 
         period_returns = returns.loc[rebalance_date:next_date].iloc[1:]

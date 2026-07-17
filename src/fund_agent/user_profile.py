@@ -360,7 +360,7 @@ def initialize_user_workspace(
         for fund in DEFAULT_FUND_UNIVERSE
     ]
     pd.DataFrame(universe_rows).to_csv(root / "universe.csv", index=False, encoding="utf-8")
-    demo_weights = [0.20, 0.15, 0.10, 0.15, 0.20, 0.10, 0.10]
+    demo_weights = [0.15, 0.15, 0.10, 0.10, 0.20, 0.10, 0.10, 0.10]
     portfolio_rows = [
         {
             "code": fund.code,

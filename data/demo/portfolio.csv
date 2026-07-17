@@ -1,8 +1,9 @@
 code,name,current_weight,current_value_yuan,notes
-800001,Demo Broad Market ETF,0.20,,Synthetic demo only
+800001,Demo Broad Market ETF,0.15,,Synthetic demo only
 800002,Demo Mid Market ETF,0.15,,Synthetic demo only
 800003,Demo Growth ETF,0.10,,Synthetic demo only
-800004,Demo Defensive ETF,0.15,,Synthetic demo only
+800004,Demo Defensive ETF,0.10,,Synthetic demo only
 800005,Demo Bond ETF,0.20,,Synthetic demo only
 800006,Demo Commodity ETF,0.10,,Synthetic demo only
 800007,Demo Global ETF,0.10,,Synthetic demo only
+800008,Demo Short Bond ETF,0.10,,Synthetic demo only

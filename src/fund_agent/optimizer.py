@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
+from scipy.optimize import linprog, minimize
 
 from fund_agent.config import FundSpec, RiskProfile
 
@@ -72,7 +72,7 @@ def min_variance(
     n_assets = len(returns.columns)
     bounds = [(0.0, profile.max_single_asset_weight) for _ in range(n_assets)]
     constraints = _constraints(returns.columns, fund_universe, profile)
-    init = np.repeat(1.0 / n_assets, n_assets)
+    init = _feasible_initial_weights(returns.columns, fund_universe, profile).to_numpy()
 
     result = minimize(
         lambda w: float(w @ cov @ w),
@@ -110,7 +110,7 @@ def max_sharpe_from_expected_returns(
     n_assets = len(returns.columns)
     bounds = [(0.0, profile.max_single_asset_weight) for _ in range(n_assets)]
     constraints = _constraints(returns.columns, fund_universe, profile)
-    init = np.repeat(1.0 / n_assets, n_assets)
+    init = _feasible_initial_weights(returns.columns, fund_universe, profile).to_numpy()
 
     def objective(weights: np.ndarray) -> float:
         ret = float(weights @ mean)
@@ -153,23 +153,54 @@ def apply_constraints(
     fund_universe: tuple[FundSpec, ...],
     profile: RiskProfile,
 ) -> pd.Series:
-    weights = weights.clip(lower=0.0, upper=profile.max_single_asset_weight)
-    weights = _cap_equity_exposure(weights, fund_universe, profile.max_equity_weight)
-    total = float(weights.sum())
-    if total <= 0:
-        return pd.Series(1.0 / len(weights), index=weights.index)
-    return weights / total
+    if weights.empty:
+        raise ValueError("Cannot apply constraints to an empty portfolio.")
+    if not weights.index.is_unique:
+        raise ValueError("Portfolio asset codes must be unique.")
+    raw_weights = pd.to_numeric(weights, errors="coerce").to_numpy(dtype=float)
+    if not np.isfinite(raw_weights).all():
+        raise ValueError("Portfolio weights must be finite numbers.")
+
+    _validate_constraint_feasibility(weights.index, fund_universe, profile)
+    feasible_initial = _feasible_initial_weights(weights.index, fund_universe, profile)
+    bounds = [(0.0, profile.max_single_asset_weight)] * len(weights)
+    constraints = _constraints(weights.index, fund_universe, profile)
+    result = minimize(
+        lambda candidate: float(np.square(candidate - raw_weights).sum()),
+        feasible_initial.to_numpy(),
+        method="SLSQP",
+        bounds=bounds,
+        constraints=constraints,
+        options={"maxiter": 500, "ftol": 1e-12},
+    )
+    if not result.success:
+        raise RuntimeError(f"Constraint projection failed: {result.message}")
+
+    projected = pd.Series(result.x, index=weights.index, dtype=float)
+    _assert_constraints(projected, fund_universe, profile)
+    return projected
 
 
-def limit_turnover(target: pd.Series, previous: pd.Series, max_turnover: float) -> pd.Series:
-    previous = previous.reindex(target.index).fillna(0.0)
-    target = target.reindex(previous.index).fillna(0.0)
+def limit_turnover(
+    target: pd.Series,
+    previous: pd.Series,
+    max_turnover: float,
+    fund_universe: tuple[FundSpec, ...],
+    profile: RiskProfile,
+) -> pd.Series:
+    if max_turnover < 0.0:
+        raise ValueError("max_turnover must be non-negative.")
+    target = target.astype(float)
+    previous = previous.reindex(target.index)
+    _assert_constraints(target, fund_universe, profile)
+    _assert_constraints(previous, fund_universe, profile)
     turnover = float((target - previous).abs().sum() / 2.0)
     if turnover <= max_turnover or turnover == 0:
-        return target
+        return target.copy()
     blend = max_turnover / turnover
     adjusted = previous + blend * (target - previous)
-    return adjusted / adjusted.sum()
+    _assert_constraints(adjusted, fund_universe, profile)
+    return adjusted
 
 
 def _constraints(
@@ -177,31 +208,106 @@ def _constraints(
     fund_universe: tuple[FundSpec, ...],
     profile: RiskProfile,
 ) -> list[dict[str, object]]:
-    equity_codes = {fund.code for fund in fund_universe if fund.is_equity_like}
-    equity_mask = np.array([1.0 if code in equity_codes else 0.0 for code in columns])
+    equity_mask = _equity_mask(columns, fund_universe)
     return [
         {"type": "eq", "fun": lambda w: np.sum(w) - 1.0},
         {"type": "ineq", "fun": lambda w: profile.max_equity_weight - float(w @ equity_mask)},
     ]
 
 
-def _cap_equity_exposure(
+def _validate_constraint_feasibility(
+    columns: pd.Index,
+    fund_universe: tuple[FundSpec, ...],
+    profile: RiskProfile,
+) -> None:
+    asset_count = len(columns)
+    equity_mask = _equity_mask(columns, fund_universe)
+    non_equity_count = int(asset_count - equity_mask.sum())
+    max_single = profile.max_single_asset_weight
+    required_non_equity = 1.0 - profile.max_equity_weight
+    tolerance = 1e-10
+    invalid_limits = not (0.0 < max_single <= 1.0 and 0.0 <= profile.max_equity_weight <= 1.0)
+    insufficient_total = asset_count * max_single < 1.0 - tolerance
+    insufficient_non_equity = (
+        non_equity_count * max_single < required_non_equity - tolerance
+    )
+    if asset_count == 0 or invalid_limits or insufficient_total or insufficient_non_equity:
+        raise ValueError(
+            "约束不可行: "
+            f"assets={asset_count}, non_equity_assets={non_equity_count}, "
+            f"max_single_asset_weight={max_single:.4f}, "
+            f"max_equity_weight={profile.max_equity_weight:.4f}, "
+            f"total_capacity={asset_count * max_single:.4f}, "
+            f"non_equity_capacity={non_equity_count * max_single:.4f}, "
+            f"required_non_equity={required_non_equity:.4f}."
+        )
+
+
+def _feasible_initial_weights(
+    columns: pd.Index,
+    fund_universe: tuple[FundSpec, ...],
+    profile: RiskProfile,
+) -> pd.Series:
+    _validate_constraint_feasibility(columns, fund_universe, profile)
+    asset_count = len(columns)
+    equity_mask = _equity_mask(columns, fund_universe)
+    result = linprog(
+        c=np.zeros(asset_count),
+        A_ub=np.atleast_2d(equity_mask),
+        b_ub=np.array([profile.max_equity_weight]),
+        A_eq=np.ones((1, asset_count)),
+        b_eq=np.array([1.0]),
+        bounds=[(0.0, profile.max_single_asset_weight)] * asset_count,
+        method="highs",
+    )
+    if not result.success:
+        raise ValueError(
+            "约束不可行: linear feasibility search failed; "
+            f"assets={asset_count}, max_single_asset_weight="
+            f"{profile.max_single_asset_weight:.4f}, "
+            f"max_equity_weight={profile.max_equity_weight:.4f}, "
+            f"reason={result.message}."
+        )
+    feasible = pd.Series(result.x, index=columns, dtype=float)
+    _assert_constraints(feasible, fund_universe, profile)
+    return feasible
+
+
+def _assert_constraints(
     weights: pd.Series,
     fund_universe: tuple[FundSpec, ...],
-    max_equity_weight: float,
-) -> pd.Series:
-    equity_codes = [fund.code for fund in fund_universe if fund.is_equity_like and fund.code in weights.index]
-    defensive_codes = [code for code in weights.index if code not in equity_codes]
-    equity_weight = float(weights.loc[equity_codes].sum()) if equity_codes else 0.0
-    if equity_weight <= max_equity_weight or not defensive_codes:
-        return weights
+    profile: RiskProfile,
+    tolerance: float = 1e-7,
+) -> None:
+    if weights.empty or not weights.index.is_unique:
+        raise ValueError("Portfolio weights must be non-empty and uniquely indexed.")
+    values = pd.to_numeric(weights, errors="coerce").to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("Portfolio weights must be finite numbers.")
+    total = float(values.sum())
+    minimum = float(values.min())
+    maximum = float(values.max())
+    equity_weight = float(values @ _equity_mask(weights.index, fund_universe))
+    violations = []
+    if abs(total - 1.0) > tolerance:
+        violations.append(f"sum={total:.12f}")
+    if minimum < -tolerance:
+        violations.append(f"min={minimum:.12f}")
+    if maximum > profile.max_single_asset_weight + tolerance:
+        violations.append(
+            f"max={maximum:.12f} > single_limit={profile.max_single_asset_weight:.12f}"
+        )
+    if equity_weight > profile.max_equity_weight + tolerance:
+        violations.append(
+            f"equity={equity_weight:.12f} > equity_limit={profile.max_equity_weight:.12f}"
+        )
+    if violations:
+        raise ValueError("Portfolio violates risk constraints: " + "; ".join(violations))
 
-    scaled = weights.copy()
-    scaled.loc[equity_codes] *= max_equity_weight / equity_weight
-    defensive_total = float(scaled.loc[defensive_codes].sum())
-    target_defensive = 1.0 - max_equity_weight
-    if defensive_total > 0:
-        scaled.loc[defensive_codes] *= target_defensive / defensive_total
-    else:
-        scaled.loc[defensive_codes] = target_defensive / len(defensive_codes)
-    return scaled
+
+def _equity_mask(
+    columns: pd.Index,
+    fund_universe: tuple[FundSpec, ...],
+) -> np.ndarray:
+    equity_codes = {fund.code for fund in fund_universe if fund.is_equity_like}
+    return np.array([1.0 if str(code) in equity_codes else 0.0 for code in columns])
