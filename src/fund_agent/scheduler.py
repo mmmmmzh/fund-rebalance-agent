@@ -6,6 +6,8 @@ from datetime import date, datetime, timedelta
 import json
 from pathlib import Path
 import sqlite3
+import threading
+import time
 from typing import Any
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -23,6 +25,8 @@ TERMINAL_STATUSES = {
     "blocked_by_risk",
 }
 LEASE_DURATION = timedelta(minutes=30)
+_INIT_LOCK = threading.Lock()
+_INITIALIZED_DATABASES: set[str] = set()
 
 
 def scheduled_tasks(
@@ -462,13 +466,45 @@ def _lease_expired(record: dict[str, Any], now: datetime) -> bool:
     return expires_at <= now
 
 
+def _enable_wal_once(connection: sqlite3.Connection, path: Path) -> None:
+    key = str(path)
+    if key in _INITIALIZED_DATABASES:
+        return
+    with _INIT_LOCK:
+        if key in _INITIALIZED_DATABASES:
+            return
+        _enable_wal(connection)
+        _INITIALIZED_DATABASES.add(key)
+
+
+def _enable_wal(connection: sqlite3.Connection, attempts: int = 10) -> None:
+    # WAL mode is persistent in the database header, but switching to it needs a
+    # short-lived exclusive lock and does NOT honor busy_timeout. Under concurrent
+    # schedulers the switch can raise "database is locked", so retry briefly and
+    # skip when another connection already enabled WAL.
+    for attempt in range(attempts):
+        current = str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower()
+        if current == "wal":
+            return
+        try:
+            result = str(connection.execute("PRAGMA journal_mode = WAL").fetchone()[0]).lower()
+        except sqlite3.OperationalError as exc:
+            message = str(exc).lower()
+            if "locked" not in message and "busy" not in message:
+                raise
+        else:
+            if result == "wal":
+                return
+        time.sleep(0.05 * (attempt + 1))
+
+
 def _connect(loaded: LoadedProfile) -> sqlite3.Connection:
     path = _registry_path(loaded)
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path, timeout=30, isolation_level=None)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA busy_timeout = 30000")
-    connection.execute("PRAGMA journal_mode = WAL")
+    _enable_wal_once(connection, path)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.executescript(
         """
